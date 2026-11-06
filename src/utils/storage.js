@@ -3,6 +3,7 @@ export const CLAVES = {
   carrito: 'sonido_vivo_carrito',
   usuarios: 'sonido_vivo_usuarios',
   sesion: 'sonido_vivo_sesion',
+  refreshToken: 'sonido_vivo_refresh_token',
   historial: (run) => `historial_${run}`,
 }
 
@@ -23,4 +24,3 @@ export function guardar(clave, valor) {
 export function eliminar(clave) {
   localStorage.removeItem(clave)
 }
-

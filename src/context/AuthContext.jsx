@@ -1,66 +1,93 @@
-import { createContext, useContext, useState } from 'react'
-import { CLAVES, leer, guardar, eliminar } from '../utils/storage'
+import { createContext, useContext, useEffect, useState } from 'react'
+import {
+  apiRequest,
+  cerrarSesion as limpiarTokens,
+  iniciarSesion,
+  registrarUsuario,
+  restaurarSesion,
+} from '../services/api'
+import { CLAVES, eliminar } from '../utils/storage'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [usuarios, setUsuarios] = useState(() => leer(CLAVES.usuarios, []))
-  const [sesion, setSesion] = useState(() => leer(CLAVES.sesion, null))
+  const [usuarios, setUsuarios] = useState([])
+  const [sesion, setSesion] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [authError, setAuthError] = useState('')
 
-  const registrar = (usuario) => {
-    if (usuarios.some((u) => u.run === usuario.run)) return false
-    const nuevaLista = [...usuarios, usuario]
-    guardar(CLAVES.usuarios, nuevaLista)
-    setUsuarios(nuevaLista)
-    return true
-  }
+  useEffect(() => {
+    let activo = true
 
-  const login = (runIngresado, password) => {
-    const run = runIngresado.trim().toUpperCase()
-    const usuario = usuarios.find(
-      (u) => u.run.toUpperCase() === run && u.password === password,
-    )
-    if (!usuario) return null
+    eliminar(CLAVES.sesion)
+    eliminar(CLAVES.usuarios)
 
-    const esAdmin =
-      usuario.email === 'admin@sonidovivo.cl' || usuario.run === '11111111-1'
+    restaurarSesion()
+      .then((usuario) => {
+        if (activo) setSesion(usuario)
+      })
+      .catch((error) => {
+        if (activo) setAuthError(error.message)
+      })
+      .finally(() => {
+        if (activo) setAuthReady(true)
+      })
 
-    const nuevaSesion = {
-      run: usuario.run,
-      nombre: usuario.nombre,
-      email: usuario.email,
-      telefono: usuario.telefono,
-      rol: esAdmin ? 'admin' : 'cliente',
+    return () => {
+      activo = false
     }
-    guardar(CLAVES.sesion, nuevaSesion)
-    setSesion(nuevaSesion)
-    return nuevaSesion
+  }, [])
+
+  useEffect(() => {
+    if (sesion?.rol !== 'admin') return
+
+    let activo = true
+    apiRequest('/usuarios')
+      .then((usuariosApi) => {
+        if (activo) setUsuarios(usuariosApi.filter((usuario) => usuario.rol === 'CLIENTE'))
+      })
+      .catch((error) => {
+        if (activo) setAuthError(error.message)
+      })
+
+    return () => {
+      activo = false
+    }
+  }, [sesion?.rol])
+
+  const registrar = (usuario) => registrarUsuario({
+    ...usuario,
+    email: usuario.email.trim().toLowerCase(),
+    run: usuario.run.trim().toUpperCase(),
+  })
+
+  const login = async (email, password) => {
+    const usuario = await iniciarSesion(email.trim().toLowerCase(), password)
+    setAuthError('')
+    setSesion(usuario)
+    return usuario
   }
 
   const logout = () => {
-    eliminar(CLAVES.sesion)
+    limpiarTokens()
     setSesion(null)
-  }
-
-  const eliminarUsuario = (run) => {
-    const nuevaLista = usuarios.filter((u) => u.run !== run)
-    guardar(CLAVES.usuarios, nuevaLista)
-    eliminar(CLAVES.historial(run))
-    setUsuarios(nuevaLista)
+    setUsuarios([])
+    setAuthError('')
   }
 
   return (
     <AuthContext.Provider
       value={{
-        usuarios,
+        usuarios: sesion?.rol === 'admin' ? usuarios : [],
         sesion,
         usuario: sesion,
         esAdmin: sesion?.rol === 'admin',
+        authReady,
+        authError,
         registrar,
         login,
         logout,
         cerrarSesion: logout,
-        eliminarUsuario,
       }}
     >
       {children}
