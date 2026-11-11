@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { limpiarRun } from '../utils/rut'
 import { primerNombre } from '../utils/formato'
 import Espacio from '../components/Espacio'
 import Modal from '../components/Modal'
@@ -10,17 +9,18 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const [run, setRun] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errores, setErrores] = useState({})
   const [sesionIniciada, setSesionIniciada] = useState(null)
+  const [enviando, setEnviando] = useState(false)
 
-  const manejarSubmit = (e) => {
+  const manejarSubmit = async (e) => {
     e.preventDefault()
     setErrores({})
 
-    if (!run.trim()) {
-      setErrores({ run: 'Debe ingresar su RUN.' })
+    if (!email.trim()) {
+      setErrores({ email: 'Debe ingresar su correo.' })
       return
     }
     if (!password) {
@@ -28,11 +28,14 @@ export default function Login() {
       return
     }
 
-    const sesion = login(run, password)
-    if (sesion) {
+    setEnviando(true)
+    try {
+      const sesion = await login(email, password)
       setSesionIniciada(sesion)
-    } else {
-      setErrores({ password: 'RUN o contraseña incorrectos.' })
+    } catch (error) {
+      setErrores({ ...error.details, formulario: error.message })
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -52,22 +55,27 @@ export default function Login() {
         </p>
 
         <form onSubmit={manejarSubmit} noValidate>
+          {errores.formulario && (
+            <div className="alert alert-danger" role="alert">{errores.formulario}</div>
+          )}
           <Espacio
-            id="login-run"
-            label="RUN de Cliente"
-            type="text"
-            maxLength={10}
-            placeholder="Ej: 12345678-5"
-            value={run}
-            onChange={(e) => setRun(limpiarRun(e.target.value))}
-            error={errores.run}
+            id="login-email"
+            label="Correo Electrónico"
+            type="email"
+            maxLength={120}
+            autoComplete="email"
+            placeholder="usuario@correo.cl"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={errores.email}
           />
 
           <Espacio
             id="login-password"
             label="Contraseña"
             type="password"
-            maxLength={30}
+            maxLength={72}
+            autoComplete="current-password"
             margen="1.5rem"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -77,8 +85,9 @@ export default function Login() {
           <button
             type="submit"
             className="btn btn-warning w-100 fw-bold py-2 mb-3"
+            disabled={enviando}
           >
-            Entrar a Mi Cuenta
+            {enviando ? 'Ingresando...' : 'Entrar a Mi Cuenta'}
           </button>
 
           <p className="text-center small text-secondary mb-0">

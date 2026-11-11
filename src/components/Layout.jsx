@@ -4,11 +4,13 @@ import { useCarrito } from '../context/CarritoContext'
 import Header from './Header'
 import Footer from './Footer'
 import Modal from './Modal'
+import { useAuth } from '../context/AuthContext'
 
 export default function Layout() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { productoAgregado, cerrarModalAgregado } = useCarrito()
+  const { authError, authReady } = useAuth()
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -17,6 +19,11 @@ export default function Layout() {
   return (
     <>
       <Header variante={pathname === '/carrito' ? 'simple' : 'completo'} />
+      {authReady && authError && (
+        <div className="container mt-3">
+          <div className="alert alert-warning" role="alert">{authError}</div>
+        </div>
+      )}
       <Outlet />
       <Footer />
 

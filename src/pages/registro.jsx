@@ -23,13 +23,14 @@ export default function Registro() {
   const [valores, setValores] = useState(VALORES_INICIALES)
   const [errores, setErrores] = useState({})
   const [registrado, setRegistrado] = useState(false)
+  const [enviando, setEnviando] = useState(false)
 
   const cambiar = (campo) => (e) => {
     const valor = campo === 'run' ? limpiarRun(e.target.value) : e.target.value
     setValores((prev) => ({ ...prev, [campo]: valor }))
   }
 
-  const manejarSubmit = (e) => {
+  const manejarSubmit = async (e) => {
     e.preventDefault()
 
     const run = valores.run.trim()
@@ -52,8 +53,8 @@ export default function Registro() {
     if (telefono.length < 9) {
       nuevosErrores.telefono = 'Ingrese un teléfono de contacto válido.'
     }
-    if (password.length < 6) {
-      nuevosErrores.password = 'La contraseña debe tener al menos 6 caracteres.'
+    if (password.length < 8 || password.length > 72) {
+      nuevosErrores.password = 'La contraseña debe tener entre 8 y 72 caracteres.'
     } else if (password !== confirm) {
       nuevosErrores.confirm = 'Las contraseñas no coinciden.'
     }
@@ -63,13 +64,16 @@ export default function Registro() {
       return
     }
 
-    if (!registrar({ run, nombre, email, telefono, password })) {
-      setErrores({ run: 'RUN ya registrado.' })
-      return
+    setEnviando(true)
+    try {
+      await registrar({ run, nombre, email, telefono, password })
+      setErrores({})
+      setRegistrado(true)
+    } catch (error) {
+      setErrores({ ...error.details, formulario: error.message })
+    } finally {
+      setEnviando(false)
     }
-
-    setErrores({})
-    setRegistrado(true)
   }
 
   return (
@@ -86,6 +90,9 @@ export default function Registro() {
         </p>
 
         <form onSubmit={manejarSubmit} noValidate>
+          {errores.formulario && (
+            <div className="alert alert-danger" role="alert">{errores.formulario}</div>
+          )}
           <Espacio
             id="run"
             label="RUN (Sin puntos y con guion)"
@@ -126,9 +133,10 @@ export default function Registro() {
           />
           <Espacio
             id="password"
-            label="Contraseña (Mínimo 6 caracteres)"
+            label="Contraseña (Mínimo 8 caracteres)"
             type="password"
-            maxLength={30}
+            maxLength={72}
+            autoComplete="new-password"
             value={valores.password}
             onChange={cambiar('password')}
             error={errores.password}
@@ -137,7 +145,8 @@ export default function Registro() {
             id="confirm-password"
             label="Confirmar Contraseña"
             type="password"
-            maxLength={30}
+            maxLength={72}
+            autoComplete="new-password"
             margen="1.8rem"
             value={valores.confirm}
             onChange={cambiar('confirm')}
@@ -147,8 +156,9 @@ export default function Registro() {
           <button
             type="submit"
             className="btn btn-warning w-100 fw-bold py-2 mb-3"
+            disabled={enviando}
           >
-            Registrarme
+            {enviando ? 'Registrando...' : 'Registrarme'}
           </button>
         </form>
       </div>
